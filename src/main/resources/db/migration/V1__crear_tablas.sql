@@ -1,7 +1,3 @@
--- V1: estructura de la base de datos de Ferreteria Los Maestros
--- Cada tabla sale de un archivo de src/mocks del frontend
-
--- usuarios.json -> usuario (admin, vendedor y cliente comparten esta tabla)
 CREATE TABLE usuario (
     id              BIGINT       NOT NULL AUTO_INCREMENT,
     rut             VARCHAR(9)   NOT NULL,
@@ -20,7 +16,6 @@ CREATE TABLE usuario (
     CONSTRAINT ck_usuario_rol CHECK (rol IN ('admin', 'vendedor', 'cliente'))
 );
 
--- clientes.json -> cliente (relacion 1 a 1 con usuario, solo para rol cliente)
 CREATE TABLE cliente (
     usuario_id                   BIGINT      NOT NULL,
     tipo_cliente                 VARCHAR(20) NOT NULL,
@@ -32,7 +27,6 @@ CREATE TABLE cliente (
     CONSTRAINT ck_cliente_saldo CHECK (saldo_adeudado >= 0)
 );
 
--- productos.json -> producto (el codigo MC001, PT001, etc. es la llave)
 CREATE TABLE producto (
     codigo        VARCHAR(10)  NOT NULL,
     categoria     VARCHAR(50)  NOT NULL,
@@ -49,7 +43,6 @@ CREATE TABLE producto (
     CONSTRAINT ck_producto_stock CHECK (stock >= 0 AND stock_minimo >= 0)
 );
 
--- pedidos.json -> pedido (los datos de "entrega" quedan como columnas)
 CREATE TABLE pedido (
     id                 BIGINT       NOT NULL AUTO_INCREMENT,
     cliente_id         BIGINT       NOT NULL,
@@ -68,9 +61,6 @@ CREATE TABLE pedido (
     CONSTRAINT ck_pedido_modalidad CHECK (modalidad_entrega IN ('retiro', 'despacho'))
 );
 
--- el arreglo "items" de cada pedido -> detalle_pedido
--- el precio se copia para que el pedido no cambie si despues se edita el producto
--- el nombre se obtiene con un JOIN a producto usando producto_codigo
 CREATE TABLE detalle_pedido (
     id               BIGINT       NOT NULL AUTO_INCREMENT,
     pedido_id        BIGINT       NOT NULL,
@@ -83,7 +73,6 @@ CREATE TABLE detalle_pedido (
     CONSTRAINT ck_detalle_cantidad CHECK (cantidad > 0)
 );
 
--- pagos.json -> pago (abonos a la cuenta corriente)
 CREATE TABLE pago (
     id          BIGINT NOT NULL AUTO_INCREMENT,
     cliente_id  BIGINT NOT NULL,

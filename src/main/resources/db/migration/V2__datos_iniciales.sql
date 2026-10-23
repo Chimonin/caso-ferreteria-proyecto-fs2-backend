@@ -1,6 +1,3 @@
--- V2: datos iniciales, copiados de los mocks JSON del frontend (src/mocks)
-
--- usuarios.json
 INSERT INTO usuario (id, rut, nombre, apellidos, correo, clave, rol, region, comuna, direccion) VALUES
 (1, '111111111', 'Carla', 'Rojas Muñoz', 'admin@duoc.cl', '1234', 'admin', 'Coquimbo', 'La Serena', 'Av. Francisco de Aguirre 100'),
 (2, '222222222', 'Pedro', 'Soto Vega', 'vendedor@duoc.cl', '1234', 'vendedor', 'Coquimbo', 'La Serena', 'Calle Balmaceda 250'),
@@ -8,13 +5,11 @@ INSERT INTO usuario (id, rut, nombre, apellidos, correo, clave, rol, region, com
 (4, '98765432K', 'Ana', 'Torres Fuentes', 'ana.torres@gmail.com', '1234', 'cliente', 'Coquimbo', 'La Serena', 'Av. del Mar 3200'),
 (5, '156789012', 'Luis', 'Fuentes Araya', 'luis.fuentes@duoc.cl', '1234', 'cliente', 'Coquimbo', 'Ovalle', 'Calle Vicuña Mackenna 780');
 
--- clientes.json
 INSERT INTO cliente (usuario_id, tipo_cliente, cuenta_corriente_habilitada, saldo_adeudado) VALUES
 (3, 'particular', FALSE, 0),
 (4, 'contratista', TRUE, 32000),
 (5, 'contratista', FALSE, 0);
 
--- productos.json
 INSERT INTO producto (codigo, categoria, subcategoria, nombre, marca, unidad, precio, stock, stock_minimo) VALUES
 ('MC001', 'Mat. Construcción', 'Cementos', 'Cemento Polpaico gris 25 kg', 'Polpaico', 'Saco', 5990, 80, 20),
 ('MC002', 'Mat. Construcción', 'Cementos', 'Cemento Melón blanco 25 kg', 'Melón', 'Saco', 7490, 40, 10),
@@ -102,13 +97,11 @@ INSERT INTO producto (codigo, categoria, subcategoria, nombre, marca, unidad, pr
 ('JA004', 'Jardín', 'Herramientas', 'Pala punta redonda #2 con mango', 'Corona', 'Unidad', 10990, 8, 2),
 ('JA005', 'Jardín', 'Herramientas', 'Rastrillo 16 dientes con mango', 'Corona', 'Unidad', 9490, 6, 2);
 
--- pedidos.json
 INSERT INTO pedido (id, cliente_id, fecha, estado, medio_pago, total) VALUES
 (1, 3, '2026-09-15', 'Pendiente', 'contado', 34760),
 (2, 4, '2026-09-17', 'En preparación', 'cuenta_corriente', 102000),
 (3, 3, '2026-09-20', 'Entregado', 'contado', 19980);
 
--- items de cada pedido
 INSERT INTO detalle_pedido (pedido_id, producto_codigo, cantidad, precio_unitario) VALUES
 (1, 'MC001', 4, 5990),
 (1, 'MC005', 6, 1800),
@@ -116,7 +109,6 @@ INSERT INTO detalle_pedido (pedido_id, producto_codigo, cantidad, precio_unitari
 (2, 'MC003', 5, 5200),
 (3, 'PT001', 2, 9990);
 
--- pagos.json
 INSERT INTO pago (id, cliente_id, fecha, monto) VALUES
 (1, 4, '2026-09-22', 40000),
 (2, 4, '2026-09-26', 30000);
