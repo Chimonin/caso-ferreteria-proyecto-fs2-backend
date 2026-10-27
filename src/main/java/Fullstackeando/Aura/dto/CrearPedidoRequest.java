@@ -5,8 +5,7 @@ import jakarta.validation.constraints.*;
 
 import java.util.List;
 
-//lo que manda el frontend al confirmar la compra en pago.jsx
-//equivale a crearPedido(clienteId, datosEntrega, medioPago) + el carrito
+//cliente id, medio pago, entregapedidorequest y itemscarritorequest
 public class CrearPedidoRequest {
 
     @NotNull(message = "Inicia sesión como cliente para comprar.")
@@ -31,8 +30,8 @@ public class CrearPedidoRequest {
     public void setClienteId(Long clienteId) { this.clienteId = clienteId; }
     public String getMedioPago() { return medioPago; }
     public void setMedioPago(String medioPago) { this.medioPago = medioPago; }
-    public EntregaRequest getEntrega() { return entrega; }
-    public void setEntrega(EntregaRequest entrega) { this.entrega = entrega; }
+    public EntregaPedidoRequest getEntrega() { return entrega; }
+    public void setEntrega(EntregaPedidoRequest entrega) { this.entrega = entrega; }
     public List<ItemCarritoRequest> getItems() { return items; }
     public void setItems(List<ItemCarritoRequest> items) { this.items = items; }
 }
