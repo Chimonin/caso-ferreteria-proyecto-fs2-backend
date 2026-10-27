@@ -68,7 +68,6 @@ public class PedidoService {
 
     //crea el pedido usando el carrito y descuenta el stock
     //@Transactional: si algo falla a mitad de camino, se deshace todo
-    //(reemplaza el "las validaciones se hacen antes de guardar" del frontend)
     @Transactional
     public Pedido crearPedido(CrearPedidoRequest request) {
         Cliente cliente = clienteRepository.findById(request.getClienteId())
@@ -83,9 +82,9 @@ public class PedidoService {
         int subtotal = 0;
 
         for (ItemCarritoRequest itemCarrito : request.getItems()) {
-            //un producto eliminado (activo = false) cuenta como que ya no existe
             Producto producto = productoRepository.findById(itemCarrito.getCodigo())
                     .filter(Producto::isActivo)
+                    //si la caja del filter llegó vacio tira este error
                     .orElseThrow(() -> new ReglaNegocioException("Uno de los productos ya no existe."));
 
             if (itemCarrito.getCantidad() > producto.getStock()) {
@@ -97,11 +96,11 @@ public class PedidoService {
             item.setProducto(producto);
             item.setCantidad(itemCarrito.getCantidad());
             item.setPrecioUnitario(producto.getPrecio());
+            //obtiene la lista con getitems y le agrega un item con add
             nuevoPedido.getItems().add(item);
 
             subtotal += item.getPrecioUnitario() * item.getCantidad();
 
-            //descuenta el stock
             producto.setStock(producto.getStock() - itemCarrito.getCantidad());
             productoRepository.save(producto);
         }
@@ -115,7 +114,7 @@ public class PedidoService {
         nuevoPedido.setEstado("Pendiente");
         nuevoPedido.setMedioPago(medioPago);
         nuevoPedido.setModalidadEntrega(modalidad);
-        //si es retiro, comuna y direccion quedan vacias igual que en Envios.jsx
+        
         if (modalidad.equals("despacho")) {
             nuevoPedido.setComunaEntrega(request.getEntrega().getComuna().trim());
             nuevoPedido.setDireccionEntrega(request.getEntrega().getDireccion().trim());
