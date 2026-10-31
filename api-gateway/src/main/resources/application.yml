@@ -1,0 +1,42 @@
+# API Gateway: React llama solo a http://localhost:8080
+# y el gateway reenvia cada peticion al microservicio que corresponde segun la ruta
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+            # login, registro, gestion de usuarios y datos de clientes
+            - id: ms-usuarios
+              uri: ${USUARIOS_URL:http://localhost:8081}
+              predicates:
+                - Path=/api/usuarios/**,/api/clientes/**
+
+            # catalogo e inventario
+            - id: ms-productos
+              uri: ${PRODUCTOS_URL:http://localhost:8082}
+              predicates:
+                - Path=/api/productos/**
+
+            # compras y estados de pedido
+            - id: ms-pedidos
+              uri: ${PEDIDOS_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/pedidos/**
+
+            # abonos a la cuenta corriente
+            - id: ms-pagos
+              uri: ${PAGOS_URL:http://localhost:8084}
+              predicates:
+                - Path=/api/pagos/**
+
+# origen del frontend autorizado (CORS), el servidor de Vite usa el 5173
+gateway:
+  cors:
+    origen: ${FRONTEND_URL:http://localhost:5173}

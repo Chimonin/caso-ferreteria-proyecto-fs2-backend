@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  pom "agregador": no es una aplicacion, solo junta los microservicios
+  para poder compilarlos todos con un comando desde la raiz del repo.
+  Cada microservicio tiene su propio pom.xml y se levanta por separado.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>Fullstackeando.Aura</groupId>
+	<artifactId>ferreteria-los-maestros</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<packaging>pom</packaging>
+	<name>ferreteria-los-maestros</name>
+
+	<modules>
+		<module>api-gateway</module>
+		<module>ms-usuarios</module>
+		<module>ms-productos</module>
+		<module>ms-pedidos</module>
+		<module>ms-pagos</module>
+	</modules>
+</project>
