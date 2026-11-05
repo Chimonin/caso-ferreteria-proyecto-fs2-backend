@@ -34,6 +34,7 @@ public class PedidoController {
 
     //GET /api/pedidos/cliente/3 -> listarPedidosCliente(3) mis pedidos
     @GetMapping("/cliente/{clienteId}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN') or #clienteId == authentication.principal")
     public List<Map<String, Object>> listarPedidosCliente(@PathVariable Long clienteId) {
         return pedidoService.listarPedidosCliente(clienteId).stream()
                 .map(this::aRespuesta)
@@ -42,6 +43,7 @@ public class PedidoController {
 
     //POST /api/pedidos -> crearPedido(...) pago
     @PostMapping
+    @org.springframework.security.access.prepost.PreAuthorize("#request.clienteId == authentication.principal")
     public ResponseEntity<Map<String, Object>> crearPedido(@Valid @RequestBody CrearPedidoRequest request) {
         Pedido pedido = pedidoService.crearPedido(request);
 

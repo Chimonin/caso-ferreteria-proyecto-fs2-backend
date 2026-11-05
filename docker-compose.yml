@@ -4,6 +4,7 @@
 
 x-db-comun: &db-comun
   DB_USER: root
+  INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Falta INTERNAL_API_KEY en el archivo .env}
   DB_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en el archivo .env}
 
 services:
@@ -40,6 +41,7 @@ services:
     build: ./ms-productos
     environment:
       <<: *db-comun
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en el archivo .env}
       DB_URL: jdbc:mysql://mysql:3306/ferreteria_productos?createDatabaseIfNotExist=true&serverTimezone=America/Santiago
     ports:
       - "8082:8082"
@@ -51,6 +53,7 @@ services:
     build: ./ms-pedidos
     environment:
       <<: *db-comun
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en el archivo .env}
       DB_URL: jdbc:mysql://mysql:3306/ferreteria_pedidos?createDatabaseIfNotExist=true&serverTimezone=America/Santiago
       # dentro de docker, cada servicio se llama por el nombre de su contenedor
       PRODUCTOS_URL: http://ms-productos:8082
@@ -65,6 +68,7 @@ services:
     build: ./ms-pagos
     environment:
       <<: *db-comun
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en el archivo .env}
       DB_URL: jdbc:mysql://mysql:3306/ferreteria_pagos?createDatabaseIfNotExist=true&serverTimezone=America/Santiago
       USUARIOS_URL: http://ms-usuarios:8081
     ports:

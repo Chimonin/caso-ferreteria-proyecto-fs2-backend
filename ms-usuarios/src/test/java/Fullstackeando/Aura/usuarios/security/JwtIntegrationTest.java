@@ -20,6 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.username=sa", "spring.datasource.password=",
         "jwt.secret=c29sby1wYXJhLXBydWViYXMtand0LXNpbi12YWxvci1yZWFsLTAxMjM0NTY=",
         "jwt.expiration-ms=3600000"
+        , "servicios.internal-key=clave-interna-solo-para-pruebas-0123456789"
 })
 @AutoConfigureMockMvc
 @Transactional
@@ -29,6 +30,128 @@ class JwtIntegrationTest {
     @Autowired UsuarioRepository usuarios;
     @Autowired PasswordEncoder encoder;
     @Autowired JwtService jwtService;
+    @Autowired Fullstackeando.Aura.usuarios.repository.ClienteRepository clientes;
+
+    private java.util.Map<String, Object> datosUsuario(String rol) {
+        var datos = new java.util.LinkedHashMap<String, Object>();
+        datos.put("rut", "176543219"); datos.put("nombre", "Prueba"); datos.put("apellidos", "Usuario");
+        datos.put("correo", "nuevo@gmail.com"); datos.put("clave", "1234"); datos.put("rol", rol);
+        datos.put("region", "Coquimbo"); datos.put("comuna", "La Serena"); datos.put("direccion", "Calle 123");
+        datos.put("tipoCliente", "contratista"); datos.put("cuentaCorrienteHabilitada", true);
+        return datos;
+    }
+
+    @Test
+    void registroPublicoCreaClienteSinCreditoYEntregaJwt() throws Exception {
+        var datos = datosUsuario("cliente");
+        datos.remove("rol"); datos.remove("cuentaCorrienteHabilitada");
+        String cuerpo = mapper.writeValueAsString(datos);
+        var respuesta = mvc.perform(post("/api/auth/registro").contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.usuario.rol").value("cliente"))
+                .andReturn().getResponse().getContentAsString();
+        var json = mapper.readTree(respuesta);
+        long id = json.get("usuario").get("id").asLong();
+        mvc.perform(get("/api/clientes/" + id).header("Authorization", "Bearer " + json.get("token").asText()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.cuentaCorrienteHabilitada").value(false));
+        login("nuevo@gmail.com");
+        mvc.perform(post("/api/auth/registro").contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void registroRechazaEscalarRolDominioNoPermitidoYComunaInvalida() throws Exception {
+        var datos = datosUsuario("admin");
+        mvc.perform(post("/api/auth/registro").contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(datos))).andExpect(status().isBadRequest());
+        datos.remove("rol"); datos.remove("cuentaCorrienteHabilitada");
+        datos.put("correo", "nuevo@example.com");
+        mvc.perform(post("/api/auth/registro").contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(datos))).andExpect(status().isConflict());
+        datos.put("correo", "nuevo@gmail.com"); datos.put("comuna", "Santiago");
+        mvc.perform(post("/api/auth/registro").contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(datos))).andExpect(status().isConflict());
+    }
+
+    @Test
+    void adminCreaEditaYDaDeBajaUsuarioSinPerderSuClave() throws Exception {
+        String admin = login("admin@duoc.cl");
+        var datos = datosUsuario("vendedor");
+        String respuesta = mvc.perform(post("/api/usuarios").header("Authorization", "Bearer " + admin)
+                        .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(datos)))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        long id = mapper.readTree(respuesta).get("id").asLong();
+        String token = login("nuevo@gmail.com");
+        datos.put("nombre", "Editado"); datos.remove("clave");
+        mvc.perform(put("/api/usuarios/" + id).header("Authorization", "Bearer " + admin)
+                        .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(datos)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.nombre").value("Editado"));
+        login("nuevo@gmail.com");
+        mvc.perform(delete("/api/usuarios/" + id).header("Authorization", "Bearer " + admin))
+                .andExpect(status().isNoContent());
+        assertFalse(usuarios.findById(id).orElseThrow().isActivo());
+        mvc.perform(get("/api/clientes").header("Authorization", "Bearer " + token)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void adminNoPuedeEliminarNiCambiarRolDelUltimoAdministrador() throws Exception {
+        String token = login("admin@duoc.cl");
+        mvc.perform(delete("/api/usuarios/1").header("Authorization", "Bearer " + token))
+                .andExpect(status().isConflict());
+        var datos = datosUsuario("vendedor"); datos.put("rut", "111111111"); datos.put("correo", "admin@duoc.cl");
+        mvc.perform(put("/api/usuarios/1").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(datos)))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void clientesConDeudaNoPuedenDarseDeBajaNiPerderCuentaCorriente() throws Exception {
+        String token = login("admin@duoc.cl");
+        for (String ruta : new String[]{"/api/clientes/4", "/api/usuarios/4"}) {
+            mvc.perform(delete(ruta).header("Authorization", "Bearer " + token)).andExpect(status().isConflict());
+        }
+        mvc.perform(put("/api/clientes/4").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"tipoCliente\":\"particular\",\"cuentaCorrienteHabilitada\":false}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void clienteCrudSoloAdminYParticularesNoObtienenCredito() throws Exception {
+        String admin = login("admin@duoc.cl");
+        String cliente = login("juan.perez@gmail.com");
+        String datos = "{\"tipoCliente\":\"particular\",\"cuentaCorrienteHabilitada\":true}";
+        mvc.perform(put("/api/clientes/3").header("Authorization", "Bearer " + cliente)
+                        .contentType(MediaType.APPLICATION_JSON).content(datos)).andExpect(status().isForbidden());
+        mvc.perform(put("/api/clientes/3").header("Authorization", "Bearer " + admin)
+                        .contentType(MediaType.APPLICATION_JSON).content(datos))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.cuentaCorrienteHabilitada").value(false));
+        clientes.deleteById(3L); clientes.flush();
+        mvc.perform(post("/api/clientes").header("Authorization", "Bearer " + admin)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"id\":3,\"tipoCliente\":\"particular\",\"cuentaCorrienteHabilitada\":false}"))
+                .andExpect(status().isCreated());
+        mvc.perform(delete("/api/clientes/3").header("Authorization", "Bearer " + admin))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void deudaInternaExigeClaveDeServicioYNoPermiteSobrepago() throws Exception {
+        mvc.perform(get("/internal/clientes/4")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/internal/clientes/4").header("Authorization", "Bearer " + login("admin@duoc.cl")))
+                .andExpect(status().isUnauthorized());
+        String clave = "clave-interna-solo-para-pruebas-0123456789";
+        mvc.perform(patch("/internal/clientes/4/sumar-deuda").header("X-Internal-Key", clave)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"monto\":1000}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/internal/clientes/4").header("X-Internal-Key", clave))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.saldoAdeudado").value(33000));
+        mvc.perform(patch("/internal/clientes/4/restar-deuda").header("X-Internal-Key", clave)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"monto\":1000}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(patch("/internal/clientes/4/restar-deuda").header("X-Internal-Key", clave)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"monto\":50000}"))
+                .andExpect(status().isConflict());
+    }
 
     private String login(String correo) throws Exception {
         String respuesta = mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)

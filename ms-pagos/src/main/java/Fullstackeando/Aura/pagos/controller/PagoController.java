@@ -32,6 +32,7 @@ public class PagoController {
 
     //GET /api/pagos/cliente/4 -> listarPagosCliente(4)
     @GetMapping("/cliente/{clienteId}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN') or #clienteId == authentication.principal")
     public List<Map<String, Object>> listarPagosCliente(@PathVariable Long clienteId) {
         return pagoService.listarPagosCliente(clienteId).stream()
                 .map(this::aRespuesta)
@@ -40,6 +41,7 @@ public class PagoController {
 
     //POST /api/pagos -> registrarPago(clienteId, monto) vista mi credito
     @PostMapping
+    @org.springframework.security.access.prepost.PreAuthorize("#request.clienteId == authentication.principal")
     public ResponseEntity<Map<String, Object>> registrarPago(@Valid @RequestBody PagoRequest request) {
         Pago pago = pagoService.registrarPago(request.getClienteId(), request.getMonto());
 

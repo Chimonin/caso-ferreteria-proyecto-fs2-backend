@@ -28,7 +28,7 @@ React sigue llamando a `http://localhost:8080`, igual que con el backend de una 
 ### Opción A: con Docker (todo de una vez)
 
 1. Instala Docker Desktop.
-2. Copia `.env.example` como `.env`, escribe una clave en `DB_PASSWORD` y genera `JWT_SECRET` con `openssl rand -base64 32`.
+2. Copia `.env.example` como `.env`, escribe una clave en `DB_PASSWORD` y genera claves distintas para `JWT_SECRET` e `INTERNAL_API_KEY` con `openssl rand -base64 32`.
 3. En la raíz del repo:
    ```powershell
    docker compose up --build
@@ -47,16 +47,18 @@ $env:DB_PASSWORD="tuClave"
 Cambia `ms-pedidos` por `ms-usuarios`, `ms-productos`, `ms-pagos` o `api-gateway`.
 Las bases de datos se crean solas con Flyway.
 
-Para `ms-usuarios` también se necesita `JWT_SECRET` en esa terminal.
+Los cuatro servicios necesitan el mismo `JWT_SECRET` y el mismo `INTERNAL_API_KEY`.
 En macOS/Linux puedes arrancarlo así (genera una clave nueva para esa ejecución):
 
 ```bash
 export JWT_SECRET="$(openssl rand -base64 32)"
+export INTERNAL_API_KEY="$(openssl rand -base64 32)"
 sh mvnw -pl ms-usuarios spring-boot:run
 ```
 
-En PowerShell, define `$env:JWT_SECRET="tuClaveBase64"` antes del comando Maven.
+En PowerShell, define `$env:JWT_SECRET="tuClaveBase64"` y `$env:INTERNAL_API_KEY="otraClaveDe32CaracteresOMas"` antes del comando Maven.
 Para conservar los tokens entre reinicios, reutiliza la misma clave privada de entorno.
+Al abrir otras terminales configura las mismas claves; no generes valores distintos para cada servicio.
 El archivo `.env` lo usa Docker Compose; Maven no lo carga automáticamente.
 
 ### Swagger de cada servicio
@@ -69,6 +71,7 @@ El login y los permisos se implementaron en `ms-usuarios`. React todavía usa la
 
 - `POST /api/auth/login`: público, recibe `{ "correo": "admin@duoc.cl", "clave": "1234" }`.
 - Devuelve `token`, `tipoToken`, `expiresIn` (segundos) y `usuario` sin contraseña.
+- `POST /api/auth/registro`: público, crea solo clientes sin cuenta corriente habilitada y entrega JWT.
 - `GET /api/usuarios` y `GET /api/usuarios/{id}`: solo administrador.
 - `GET /api/clientes`: solo administrador.
 - `GET /api/clientes/{id}`: administrador o el propio cliente.
@@ -92,8 +95,9 @@ El gateway reenvía `/api/auth/**` a usuarios. Si lo arrancas, puedes hacer logi
 http://localhost:8080/api/auth/login y enviar `Authorization: Bearer <token>` en las consultas.
 La firma, el vencimiento y el usuario activo se validan en cada petición; el rol se vuelve a leer de la base.
 Cerrar sesión en React consistirá en borrar el token; una copia seguirá siendo válida hasta vencer.
-No hay refresh token, revocación ni registro público implementados en este avance.
-Los otros microservicios todavía no validan JWT y los endpoints internos siguen pendientes.
+No hay refresh token ni revocación de tokens implementados en este avance.
+Productos también valida firma y vencimiento del JWT; allí los roles firmados duran hasta el vencimiento.
+Pedidos y pagos también validan el JWT y la propiedad de las operaciones. Sus llamadas internas envían la clave de servicio.
 
 ### Estructura agregada
 
@@ -110,6 +114,64 @@ Las pruebas de JWT usan H2 en memoria, sin modificar el MySQL local:
 
 ```bash
 sh mvnw -pl ms-usuarios test
+```
+
+## Gestión de usuarios, clientes y productos
+
+| Método | Ruta | Acceso |
+|---|---|---|
+| POST | `/api/usuarios` | Administrador |
+| PUT | `/api/usuarios/{id}` | Administrador |
+| DELETE | `/api/usuarios/{id}` | Administrador |
+| POST | `/api/clientes` | Administrador |
+| PUT | `/api/clientes/{id}` | Administrador |
+| DELETE | `/api/clientes/{id}` | Administrador |
+| GET | `/api/productos` y `/api/productos/{codigo}` | Público |
+| POST | `/api/productos` | Administrador |
+| PUT | `/api/productos/{codigo}` | Administrador, datos completos |
+| PATCH | `/api/productos/{codigo}` | Administrador, precio y/o stock |
+| PATCH | `/api/productos/{codigo}/stock` | Administrador o vendedor, solo stock |
+| DELETE | `/api/productos/{codigo}` | Administrador |
+| GET | `/api/pedidos` | Administrador o vendedor |
+| GET | `/api/pedidos/cliente/{clienteId}` | Administrador o el cliente dueño |
+| POST | `/api/pedidos` | Cliente, solo su propio id |
+| PATCH | `/api/pedidos/{id}/estado` | Administrador o vendedor |
+| GET | `/api/pagos` | Administrador |
+| GET | `/api/pagos/cliente/{clienteId}` | Administrador o el cliente dueño |
+| POST | `/api/pagos` | Cliente, solo su propio id |
+
+Los usuarios se crean con `rut`, `nombre`, `apellidos`, `correo`, `clave`, `rol`, `region`,
+`comuna`, `direccion`, y para clientes también `tipoCliente` y `cuentaCorrienteHabilitada`.
+La edición recibe los mismos datos, pero conserva la clave actual. El registro público recibe
+esos datos sin `rol` ni `cuentaCorrienteHabilitada`: ambos se fijan en el servidor.
+Al crear un usuario cliente, se crea su registro de cliente en la misma transacción.
+
+`POST /api/clientes` recibe `{ "id": 3, "tipoCliente": "particular", "cuentaCorrienteHabilitada": false }`
+y vincula un usuario existente con rol cliente que todavía no tenga ese registro.
+`PUT /api/clientes/{id}` recibe solo `tipoCliente` y `cuentaCorrienteHabilitada`.
+Solo contratistas pueden tener cuenta corriente. No se quita una cuenta con deuda ni se da de baja
+un cliente endeudado. Tampoco se elimina ni se cambia el rol del último administrador activo.
+Las bajas de usuario/cliente desactivan el usuario y conservan su registro para el historial.
+
+Los productos se crean o reemplazan con `codigo`, `nombre`, `categoria`, `subcategoria`, `marca`,
+`unidad`, `precio`, `stock` y `stockMinimo`. Precio debe ser entero positivo y stock/mínimo enteros no negativos.
+La baja deja `activo = false`; ya no aparece en el catálogo pero permanece en MySQL.
+El PATCH de stock rechaza campos adicionales como `precio`, incluso si lo llama un vendedor.
+
+### Llamadas internas
+
+Usuarios y productos exigen `X-Internal-Key` en sus rutas `/internal/**`.
+Un JWT de administrador no sustituye esa clave. Pedidos y pagos la obtienen de `INTERNAL_API_KEY`
+y la agregan a sus clientes HTTP. El gateway no publica estas rutas.
+Swagger muestra un esquema `internalKey` para probarlas localmente; no compartas esa clave con React.
+Las deudas se actualizan con bloqueo de filas y validación de saldo.
+El descuento de stock agrupa códigos repetidos, bloquea en orden y revierte toda la operación si un item falla.
+La reposición permite compensar un producto dado de baja después del descuento.
+
+Pruebas de ambos servicios, con H2 aislado del MySQL local:
+
+```bash
+sh mvnw -pl ms-usuarios,ms-productos,ms-pedidos,ms-pagos test
 ```
 
 ## Endpoints públicos (los llama React a través del gateway)
@@ -131,7 +193,7 @@ Pedidos y pagos necesitan datos de usuarios y productos. Como están en otras ba
 los piden por HTTP a estos endpoints. Empiezan con `/internal` y **el gateway no los expone**:
 solo los usan los microservicios entre ellos.
 
-**ms-productos debe tener:**
+**ms-productos implementa:**
 
 | Endpoint | Body | Respuesta OK | Errores |
 |---|---|---|---|
@@ -141,7 +203,7 @@ solo los usan los microservicios entre ellos.
 `descontar-stock` debe ser `@Transactional`: revisa que **todos** existan, estén activos y
 tengan stock, y descuenta todo junto. Si uno falla, no descuenta ninguno.
 
-**ms-usuarios debe tener:**
+**ms-usuarios implementa:**
 
 | Endpoint | Body | Respuesta OK | Errores |
 |---|---|---|---|

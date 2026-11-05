@@ -16,8 +16,9 @@ public class ProductoClient {
 
     private final RestClient restClient;
 
-    public ProductoClient(@Value("${servicios.productos.url}") String url) {
-        this.restClient = RestClient.builder().baseUrl(url).build();
+    public ProductoClient(@Value("${servicios.productos.url}") String url,
+                         @Value("${servicios.internal-key}") String internalKey) {
+        this.restClient = RestClient.builder().baseUrl(url).defaultHeader("X-Internal-Key", internalKey).build();
     }
 
     //POST /internal/productos/descontar-stock

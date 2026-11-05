@@ -14,8 +14,9 @@ public class ClienteClient {
 
     private final RestClient restClient;
 
-    public ClienteClient(@Value("${servicios.usuarios.url}") String url) {
-        this.restClient = RestClient.builder().baseUrl(url).build();
+    public ClienteClient(@Value("${servicios.usuarios.url}") String url,
+                         @Value("${servicios.internal-key}") String internalKey) {
+        this.restClient = RestClient.builder().baseUrl(url).defaultHeader("X-Internal-Key", internalKey).build();
     }
 
     //GET /internal/clientes/3

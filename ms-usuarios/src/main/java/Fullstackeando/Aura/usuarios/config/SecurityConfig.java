@@ -1,6 +1,7 @@
 package Fullstackeando.Aura.usuarios.config;
 
 import Fullstackeando.Aura.usuarios.security.JwtAuthFilter;
+import Fullstackeando.Aura.usuarios.security.ServicioInternoFilter;
 import org.springframework.context.annotation.*;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -17,17 +18,19 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity
 public class SecurityConfig {
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtFilter) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtFilter, ServicioInternoFilter interno) throws Exception {
         return http
                 //el token se envia por header, sin cookies de sesion
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/registro").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/error").permitAll()
+                        .requestMatchers("/internal/**").hasRole("MICROSERVICIO")
                         .requestMatchers("/api/usuarios/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/clientes").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/clientes/*").hasAnyRole("ADMIN", "CLIENTE")
+                        .requestMatchers("/api/clientes", "/api/clientes/**").hasRole("ADMIN")
                         .anyRequest().denyAll())
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint((req, res, ex) -> {
@@ -41,6 +44,7 @@ public class SecurityConfig {
                             res.getWriter().write("{\"error\":\"SIN_PERMISO\",\"mensaje\":\"No tienes permiso para esta acción\"}");
                         }))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(interno, JwtAuthFilter.class)
                 .build();
     }
 
