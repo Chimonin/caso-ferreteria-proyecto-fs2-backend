@@ -1,4 +1,4 @@
-package fullstackeando.aura.productos.exception;
+package Fullstackeando.Aura.productos.exception;
 
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.*;
@@ -21,9 +21,33 @@ public class GestionExceptionHandler {
         return ResponseEntity.status(409).body(Map.of("error", "CONFLICTO", "mensaje", "Los datos ya existen o no cumplen las restricciones"));
     }
 
-    @ExceptionHandler({HttpMessageNotReadableException.class, HandlerMethodValidationException.class,
-            ConstraintViolationException.class, MethodArgumentNotValidException.class})
-    public ResponseEntity<Map<String, String>> validacion(Exception error) {
-        return ResponseEntity.badRequest().body(Map.of("error", "VALIDACION", "mensaje", "Revisa los campos obligatorios y usa cantidades enteras válidas"));
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, String>> validacionBody(MethodArgumentNotValidException error) {
+        String mensaje = error.getBindingResult().getFieldErrors().stream()
+                .map(campo -> campo.getDefaultMessage()).findFirst().orElse("Datos no válidos");
+        return validacion(mensaje);
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<Map<String, String>> validacionLista(HandlerMethodValidationException error) {
+        String mensaje = error.getAllErrors().stream()
+                .map(e -> e.getDefaultMessage()).findFirst().orElse("Datos no válidos");
+        return validacion(mensaje);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<Map<String, String>> validacionParametros(ConstraintViolationException error) {
+        String mensaje = error.getConstraintViolations().stream()
+                .map(v -> v.getMessage()).findFirst().orElse("Datos no válidos");
+        return validacion(mensaje);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, String>> jsonInvalido(HttpMessageNotReadableException error) {
+        return validacion("El formato de los datos no es válido: revisa los nombres de los campos y usa números enteros");
+    }
+
+    private ResponseEntity<Map<String, String>> validacion(String mensaje) {
+        return ResponseEntity.badRequest().body(Map.of("error", "VALIDACION", "mensaje", mensaje));
     }
 }
