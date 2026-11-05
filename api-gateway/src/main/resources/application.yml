@@ -16,7 +16,7 @@ spring:
             - id: ms-usuarios
               uri: ${USUARIOS_URL:http://localhost:8081}
               predicates:
-                - Path=/api/usuarios/**,/api/clientes/**
+                - Path=/api/auth/**,/api/usuarios/**,/api/clientes/**
 
             # catalogo e inventario
             - id: ms-productos

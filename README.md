@@ -28,7 +28,7 @@ React sigue llamando a `http://localhost:8080`, igual que con el backend de una 
 ### Opción A: con Docker (todo de una vez)
 
 1. Instala Docker Desktop.
-2. Copia `.env.example` como `.env` y escribe una clave en `DB_PASSWORD`.
+2. Copia `.env.example` como `.env`, escribe una clave en `DB_PASSWORD` y genera `JWT_SECRET` con `openssl rand -base64 32`.
 3. En la raíz del repo:
    ```powershell
    docker compose up --build
@@ -47,8 +47,70 @@ $env:DB_PASSWORD="tuClave"
 Cambia `ms-pedidos` por `ms-usuarios`, `ms-productos`, `ms-pagos` o `api-gateway`.
 Las bases de datos se crean solas con Flyway.
 
+Para `ms-usuarios` también se necesita `JWT_SECRET` en esa terminal.
+En macOS/Linux puedes arrancarlo así (genera una clave nueva para esa ejecución):
+
+```bash
+export JWT_SECRET="$(openssl rand -base64 32)"
+sh mvnw -pl ms-usuarios spring-boot:run
+```
+
+En PowerShell, define `$env:JWT_SECRET="tuClaveBase64"` antes del comando Maven.
+Para conservar los tokens entre reinicios, reutiliza la misma clave privada de entorno.
+El archivo `.env` lo usa Docker Compose; Maven no lo carga automáticamente.
+
 ### Swagger de cada servicio
 `http://localhost:8083/swagger-ui.html` (cambia el puerto según el servicio).
+
+## Login con JWT en usuarios
+
+Basado en el ejemplo del profesor: https://github.com/donkiwicl/fs2_jwt_backend.
+El login y los permisos se implementaron en `ms-usuarios`. React todavía usa la sesión simulada.
+
+- `POST /api/auth/login`: público, recibe `{ "correo": "admin@duoc.cl", "clave": "1234" }`.
+- Devuelve `token`, `tipoToken`, `expiresIn` (segundos) y `usuario` sin contraseña.
+- `GET /api/usuarios` y `GET /api/usuarios/{id}`: solo administrador.
+- `GET /api/clientes`: solo administrador.
+- `GET /api/clientes/{id}`: administrador o el propio cliente.
+- Sin token válido: 401. Con token válido pero sin permiso: 403.
+
+Las cuentas iniciales mantienen la clave `1234`: `admin@duoc.cl`, `vendedor@duoc.cl`,
+`juan.perez@gmail.com`, `ana.torres@gmail.com` y `luis.fuentes@duoc.cl`.
+La migración Java `V3__encriptar_claves` convierte las claves existentes a hashes BCrypt una sola vez.
+El secreto JWT se configura con `JWT_SECRET` (Base64 de al menos 32 bytes) y el vencimiento
+con `JWT_EXPIRATION_MS` (por defecto, una hora). El secreto nunca se envía a React.
+
+### Probar en Swagger
+
+1. Arranca MySQL y `ms-usuarios`.
+2. Abre http://localhost:8081/swagger-ui/index.html.
+3. Ejecuta el login con una cuenta inicial.
+4. Copia el campo `token`, presiona **Authorize** y pega solo el token, sin escribir `Bearer`.
+5. Prueba las consultas. Cambia a una cuenta cliente para comprobar los permisos.
+
+El gateway reenvía `/api/auth/**` a usuarios. Si lo arrancas, puedes hacer login por
+http://localhost:8080/api/auth/login y enviar `Authorization: Bearer <token>` en las consultas.
+La firma, el vencimiento y el usuario activo se validan en cada petición; el rol se vuelve a leer de la base.
+Cerrar sesión en React consistirá en borrar el token; una copia seguirá siendo válida hasta vencer.
+No hay refresh token, revocación ni registro público implementados en este avance.
+Los otros microservicios todavía no validan JWT y los endpoints internos siguen pendientes.
+
+### Estructura agregada
+
+```text
+ms-usuarios/src/main/java/Fullstackeando/Aura/usuarios/
+  config/     SecurityConfig (permisos), OpenApiConfig (Authorize)
+  security/   JwtService, JwtAuthFilter, UsuarioAutenticado
+  service/    AuthService, UsuarioDetailsService
+  controller/ AuthController
+  dto/        LoginRequest, AuthResponse
+```
+
+Las pruebas de JWT usan H2 en memoria, sin modificar el MySQL local:
+
+```bash
+sh mvnw -pl ms-usuarios test
+```
 
 ## Endpoints públicos (los llama React a través del gateway)
 

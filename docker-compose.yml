@@ -28,6 +28,7 @@ services:
     build: ./ms-usuarios
     environment:
       <<: *db-comun
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en el archivo .env}
       DB_URL: jdbc:mysql://mysql:3306/ferreteria_usuarios?createDatabaseIfNotExist=true&serverTimezone=America/Santiago
     ports:
       - "8081:8081"

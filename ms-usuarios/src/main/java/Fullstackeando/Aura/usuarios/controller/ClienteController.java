@@ -3,6 +3,7 @@ package Fullstackeando.Aura.usuarios.controller;
 import Fullstackeando.Aura.usuarios.dto.ClienteResponse;
 import Fullstackeando.Aura.usuarios.service.ClienteService;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -22,6 +23,7 @@ public class ClienteController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('CLIENTE') and #id == authentication.principal.id)")
     public ClienteResponse obtenerCliente(@PathVariable Long id) {
         return clienteService.obtenerCliente(id);
     }
