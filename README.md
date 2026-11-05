@@ -98,7 +98,7 @@ Los otros microservicios todavía no validan JWT y los endpoints internos siguen
 ### Estructura agregada
 
 ```text
-ms-usuarios/src/main/java/Fullstackeando/Aura/usuarios/
+ms-usuarios/src/main/java/fullstackeando/aura/usuarios/
   config/     SecurityConfig (permisos), OpenApiConfig (Authorize)
   security/   JwtService, JwtAuthFilter, UsuarioAutenticado
   service/    AuthService, UsuarioDetailsService
