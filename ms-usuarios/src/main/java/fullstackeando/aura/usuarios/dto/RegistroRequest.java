@@ -1,4 +1,4 @@
-package Fullstackeando.Aura.usuarios.dto;
+package fullstackeando.aura.usuarios.dto;
 
 import jakarta.validation.constraints.*;
 

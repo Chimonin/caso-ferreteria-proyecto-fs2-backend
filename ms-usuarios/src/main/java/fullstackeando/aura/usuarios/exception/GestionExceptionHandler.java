@@ -1,4 +1,4 @@
-package Fullstackeando.Aura.usuarios.exception;
+package fullstackeando.aura.usuarios.exception;
 
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.*;
