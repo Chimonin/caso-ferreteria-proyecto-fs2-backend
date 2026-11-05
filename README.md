@@ -102,7 +102,7 @@ Pedidos y pagos también validan el JWT y la propiedad de las operaciones. Sus l
 ### Estructura agregada
 
 ```text
-ms-usuarios/src/main/java/Fullstackeando/Aura/usuarios/
+ms-usuarios/src/main/java/fullstackeando/aura/usuarios/
   config/     SecurityConfig (permisos), OpenApiConfig (Authorize)
   security/   JwtService, JwtAuthFilter, UsuarioAutenticado
   service/    AuthService, UsuarioDetailsService
