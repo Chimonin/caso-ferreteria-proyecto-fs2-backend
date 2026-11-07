@@ -1,12 +1,22 @@
+# Version para el SERVIDOR (EC2 en AWS)
+# No compila nada: descarga de ECR las imagenes que subiste con subir-imagenes-ecr.ps1
+#
+# En el servidor solo van este archivo y el .env
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+
 x-db-comun: &db-comun
   DB_USER: root
   DB_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en el archivo .env}
   INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Falta INTERNAL_API_KEY en el archivo .env}
   JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en el archivo .env}
+  # limita la memoria de Java de cada servicio, para que los 5 quepan en un servidor chico
   JAVA_TOOL_OPTIONS: -Xmx256m
 
 services:
 
+  # un solo servidor MySQL, pero cada microservicio usa su PROPIA base de datos
+  # sin "ports": MySQL solo se puede usar desde los otros contenedores, no desde internet
   mysql:
     image: mysql:8.4
     restart: unless-stopped
@@ -20,6 +30,8 @@ services:
       timeout: 5s
       retries: 20
 
+  # los microservicios tampoco tienen "ports": desde internet solo se entra por el gateway (8080)
+  # asi nadie puede llamar directo a /internal ni saltarse el gateway
   ms-usuarios:
     image: ${ECR_REGISTRO:?Falta ECR_REGISTRO en el archivo .env}/ferreteria/ms-usuarios:latest
     restart: unless-stopped
@@ -46,6 +58,7 @@ services:
     environment:
       <<: *db-comun
       DB_URL: jdbc:mysql://mysql:3306/ferreteria_pedidos?createDatabaseIfNotExist=true&serverTimezone=America/Santiago
+      # dentro de docker, cada servicio se llama por el nombre de su contenedor
       PRODUCTOS_URL: http://ms-productos:8082
       USUARIOS_URL: http://ms-usuarios:8081
     depends_on:
@@ -63,6 +76,7 @@ services:
       mysql:
         condition: service_healthy
 
+  # unico punto de entrada desde internet: http://<ip-del-servidor>:8080
   api-gateway:
     image: ${ECR_REGISTRO:?Falta ECR_REGISTRO en el archivo .env}/ferreteria/api-gateway:latest
     restart: unless-stopped
@@ -71,7 +85,9 @@ services:
       PRODUCTOS_URL: http://ms-productos:8082
       PEDIDOS_URL: http://ms-pedidos:8083
       PAGOS_URL: http://ms-pagos:8084
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      # donde quede publicado el frontend, separados por coma si son varios
+      # si no se pone en el .env: Vite en tu computador (5173 npm run dev, 4173 vite preview / Playwright)
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173,http://localhost:4173}
       JAVA_TOOL_OPTIONS: -Xmx256m
     ports:
       - "8080:8080"

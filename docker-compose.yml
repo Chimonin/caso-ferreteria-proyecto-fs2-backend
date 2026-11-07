@@ -1,3 +1,7 @@
+# Levanta todo el backend con un solo comando:
+#   docker compose up --build
+# La clave de MySQL se lee del archivo .env (copia .env.example y ponle tu clave)
+
 x-db-comun: &db-comun
   DB_USER: root
   INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Falta INTERNAL_API_KEY en el archivo .env}
@@ -5,11 +9,13 @@ x-db-comun: &db-comun
 
 services:
 
+  # un solo servidor MySQL, pero cada microservicio usa su PROPIA base de datos
   mysql:
     image: mysql:8.4
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en el archivo .env}
     ports:
+      # 3307 afuera para no chocar con el MySQL que tienes instalado en tu computador (3306)
       - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
@@ -49,6 +55,7 @@ services:
       <<: *db-comun
       JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en el archivo .env}
       DB_URL: jdbc:mysql://mysql:3306/ferreteria_pedidos?createDatabaseIfNotExist=true&serverTimezone=America/Santiago
+      # dentro de docker, cada servicio se llama por el nombre de su contenedor
       PRODUCTOS_URL: http://ms-productos:8082
       USUARIOS_URL: http://ms-usuarios:8081
     ports:
@@ -70,6 +77,7 @@ services:
       mysql:
         condition: service_healthy
 
+  # unico punto de entrada para React: http://localhost:8080
   api-gateway:
     build: ./api-gateway
     environment:
@@ -77,7 +85,8 @@ services:
       PRODUCTOS_URL: http://ms-productos:8082
       PEDIDOS_URL: http://ms-pedidos:8083
       PAGOS_URL: http://ms-pagos:8084
-      FRONTEND_URL: http://localhost:5173
+      # separados por coma: 5173 (npm run dev) y 4173 (vite preview, Playwright)
+      FRONTEND_URL: http://localhost:5173,http://localhost:4173
     ports:
       - "8080:8080"
     depends_on:

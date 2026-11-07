@@ -36,7 +36,8 @@ spring:
               predicates:
                 - Path=/api/pagos/**
 
-# origen del frontend autorizado (CORS), el servidor de Vite usa el 5173
+# origenes del frontend autorizados (CORS), separados por coma
+# 5173: npm run dev   /   4173: vite preview (lo usa Playwright)
 gateway:
   cors:
-    origen: ${FRONTEND_URL:http://localhost:5173}
+    origen: ${FRONTEND_URL:http://localhost:5173,http://localhost:4173}
