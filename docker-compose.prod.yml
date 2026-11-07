@@ -1,0 +1,85 @@
+x-db-comun: &db-comun
+  DB_USER: root
+  DB_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en el archivo .env}
+  INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Falta INTERNAL_API_KEY en el archivo .env}
+  JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en el archivo .env}
+  JAVA_TOOL_OPTIONS: -Xmx256m
+
+services:
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en el archivo .env}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  ms-usuarios:
+    image: ${ECR_REGISTRO:?Falta ECR_REGISTRO en el archivo .env}/ferreteria/ms-usuarios:latest
+    restart: unless-stopped
+    environment:
+      <<: *db-comun
+      DB_URL: jdbc:mysql://mysql:3306/ferreteria_usuarios?createDatabaseIfNotExist=true&serverTimezone=America/Santiago
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  ms-productos:
+    image: ${ECR_REGISTRO:?Falta ECR_REGISTRO en el archivo .env}/ferreteria/ms-productos:latest
+    restart: unless-stopped
+    environment:
+      <<: *db-comun
+      DB_URL: jdbc:mysql://mysql:3306/ferreteria_productos?createDatabaseIfNotExist=true&serverTimezone=America/Santiago
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  ms-pedidos:
+    image: ${ECR_REGISTRO:?Falta ECR_REGISTRO en el archivo .env}/ferreteria/ms-pedidos:latest
+    restart: unless-stopped
+    environment:
+      <<: *db-comun
+      DB_URL: jdbc:mysql://mysql:3306/ferreteria_pedidos?createDatabaseIfNotExist=true&serverTimezone=America/Santiago
+      PRODUCTOS_URL: http://ms-productos:8082
+      USUARIOS_URL: http://ms-usuarios:8081
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  ms-pagos:
+    image: ${ECR_REGISTRO:?Falta ECR_REGISTRO en el archivo .env}/ferreteria/ms-pagos:latest
+    restart: unless-stopped
+    environment:
+      <<: *db-comun
+      DB_URL: jdbc:mysql://mysql:3306/ferreteria_pagos?createDatabaseIfNotExist=true&serverTimezone=America/Santiago
+      USUARIOS_URL: http://ms-usuarios:8081
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  api-gateway:
+    image: ${ECR_REGISTRO:?Falta ECR_REGISTRO en el archivo .env}/ferreteria/api-gateway:latest
+    restart: unless-stopped
+    environment:
+      USUARIOS_URL: http://ms-usuarios:8081
+      PRODUCTOS_URL: http://ms-productos:8082
+      PEDIDOS_URL: http://ms-pedidos:8083
+      PAGOS_URL: http://ms-pagos:8084
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      JAVA_TOOL_OPTIONS: -Xmx256m
+    ports:
+      - "8080:8080"
+    depends_on:
+      - ms-usuarios
+      - ms-productos
+      - ms-pedidos
+      - ms-pagos
+
+volumes:
+  mysql_data:
