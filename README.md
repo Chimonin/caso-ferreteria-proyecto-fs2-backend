@@ -3,6 +3,12 @@
 Backend en Spring Boot 4.1 + MySQL, dividido en 4 microservicios y un API Gateway.
 Cada microservicio es una aplicación independiente, con su propia base de datos.
 
+## GitHub Actions
+
+El workflow **Backend CI-CD** ejecuta las pruebas HTTP con Docker en cada push a `main` y pull request.
+El despliegue a ECR/EC2 queda desactivado hasta configurar AWS. Consulta [docs/CI-CD.md](docs/CI-CD.md)
+para ver los pasos, variables, permisos y cómo ejecutar el pipeline localmente.
+
 ## Estructura
 
 | Carpeta        | Puerto | Base de datos          | Qué hace                                   | Responsable |
@@ -110,10 +116,10 @@ ms-usuarios/src/main/java/fullstackeando/aura/usuarios/
   dto/        LoginRequest, AuthResponse
 ```
 
-Las pruebas de JWT usan H2 en memoria, sin modificar el MySQL local:
+Las pruebas de usuarios y JWT llaman por HTTP al backend encendido, igual que las de pedidos y pagos:
 
 ```bash
-sh mvnw -pl ms-usuarios test
+BACKEND_URL=http://localhost:8080 sh mvnw -pl ms-usuarios test
 ```
 
 ## Gestión de usuarios, clientes y productos
@@ -168,11 +174,32 @@ Las deudas se actualizan con bloqueo de filas y validación de saldo.
 El descuento de stock agrupa códigos repetidos, bloquea en orden y revierte toda la operación si un item falla.
 La reposición permite compensar un producto dado de baja después del descuento.
 
-Pruebas de ambos servicios, con H2 aislado del MySQL local:
+Las pruebas usan `RestClient`, login real y la variable `BACKEND_URL` apuntando al gateway.
+Primero levanta los cuatro microservicios, el gateway y MySQL. Luego ejecuta:
 
 ```bash
-sh mvnw -pl ms-usuarios,ms-productos,ms-pedidos,ms-pagos test
+BACKEND_URL=http://localhost:8080 sh mvnw -pl ms-usuarios,ms-productos,ms-pedidos,ms-pagos test
 ```
+
+En PowerShell: `$env:BACKEND_URL="http://localhost:8080"` y luego el comando Maven.
+Sin `BACKEND_URL`, las pruebas se omiten; un build exitoso en ese caso solo confirma la compilación.
+
+| Archivo | Qué comprueba |
+|---|---|
+| `UsuarioTest` | Registro, login, CRUD, duplicados, último administrador y permisos JWT |
+| `ClienteTest` | Cuenta propia, tipo de cliente, crédito, restricciones de deuda y bajas |
+| `ProductoTest` | Catálogo público, CRUD, validaciones, stock bajo y permisos del vendedor |
+| `PedidoTest` | Compras al contado/crédito, stock y estado del pedido |
+| `PagoTest` | Abonos, deuda, historial y permisos |
+
+Usa una base de pruebas: son llamadas reales y escriben en MySQL.
+Usuarios, clientes y productos crean registros propios con identificadores únicos y los dan de baja al terminar;
+los registros históricos permanecen. `ClienteTest` crea además una compra y un pago propios para probar la deuda.
+Las pruebas de pedidos y pagos conservan el comportamiento de los archivos de la compañera:
+usan las cuentas iniciales y modifican su stock y saldo.
+Esta suite no inspecciona hashes BCrypt ni firma tokens de prueba, y no comprueba directamente
+la expiración del token ni la concurrencia interna. Se reemplazaron las pruebas con H2, MockMvc y Mockito
+por comprobaciones del comportamiento observable por HTTP.
 
 ## Endpoints públicos (los llama React a través del gateway)
 

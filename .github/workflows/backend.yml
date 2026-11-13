@@ -1,0 +1,120 @@
+name: Backend CI-CD
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verificar:
+    name: Compilar y probar por HTTP
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      COMPOSE_PROJECT_NAME: ferreteria-ci
+      COMPOSE_PARALLEL_LIMIT: '2'
+      BACKEND_URL: http://127.0.0.1:18080
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Generar claves exclusivas de pruebas
+        shell: bash
+        run: |
+          for nombre in DB_PASSWORD JWT_SECRET INTERNAL_API_KEY; do
+            valor=$(openssl rand -base64 32)
+            echo "::add-mask::$valor"
+            echo "$nombre=$valor" >> "$GITHUB_ENV"
+          done
+      - name: Construir y levantar los servicios con MySQL de pruebas
+        run: docker compose --env-file /dev/null -f docker-compose.ci.yml up --build -d
+      - name: Esperar al backend completo
+        run: python3 scripts/esperar-backend.py
+      - name: Ejecutar pruebas con el backend encendido
+        run: sh mvnw -B clean verify
+      - name: Comprobar que las pruebas no fueron omitidas
+        run: python3 scripts/verificar-reportes.py
+      - name: Guardar estado y logs
+        if: always()
+        run: |
+          mkdir -p reports
+          docker compose --env-file /dev/null -f docker-compose.ci.yml ps -a > reports/contenedores.txt
+          docker compose --env-file /dev/null -f docker-compose.ci.yml logs --no-color > reports/backend.log 2>&1
+      - name: Publicar informes de pruebas
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: backend-reportes
+          path: |
+            **/target/surefire-reports/
+            reports/
+          retention-days: 7
+      - name: Eliminar solo los contenedores y datos de CI
+        if: always()
+        run: docker compose --env-file /dev/null -f docker-compose.ci.yml down -v --remove-orphans
+
+  desplegar:
+    name: Publicar en ECR y actualizar EC2
+    needs: verificar
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.AWS_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+      AWS_DEPLOY_DIR: ${{ vars.AWS_DEPLOY_DIR }}
+      AWS_COMPOSE_PROJECT: ${{ vars.AWS_COMPOSE_PROJECT }}
+      AWS_DOCKER_PLATFORM: ${{ vars.AWS_DOCKER_PLATFORM || 'linux/amd64' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Comprobar configuración y versión actual de main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test -n "$AWS_REGION" && test -n "$AWS_ROLE_ARN" && test -n "$EC2_INSTANCE_ID"
+          test -n "$AWS_DEPLOY_DIR" && test -n "$AWS_COMPOSE_PROJECT"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)" = "$GITHUB_SHA"
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        if: env.AWS_DOCKER_PLATFORM == 'linux/arm64'
+        with:
+          platforms: arm64
+      - name: Construir y publicar las cinco imágenes con el SHA del commit
+        env:
+          ECR_REGISTRO: ${{ steps.ecr.outputs.registry }}
+        run: |
+          case "$AWS_DOCKER_PLATFORM" in linux/amd64|linux/arm64) ;; *) exit 1 ;; esac
+          for servicio in api-gateway ms-usuarios ms-productos ms-pedidos ms-pagos; do
+            docker buildx build --platform "$AWS_DOCKER_PLATFORM" --push \
+              --tag "$ECR_REGISTRO/ferreteria/$servicio:$GITHUB_SHA" "$servicio"
+          done
+      - name: Desplegar en EC2 mediante Systems Manager
+        env:
+          ECR_REGISTRO: ${{ steps.ecr.outputs.registry }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)" = "$GITHUB_SHA"
+          python3 scripts/enviar-deploy.py

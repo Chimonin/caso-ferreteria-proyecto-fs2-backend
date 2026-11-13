@@ -1,5 +1,5 @@
 # Version para el SERVIDOR (EC2 en AWS)
-# No compila nada: descarga de ECR las imagenes que subiste con subir-imagenes-ecr.ps1
+# No compila nada: descarga de ECR las imagenes publicadas por GitHub Actions o manualmente.
 #
 # En el servidor solo van este archivo y el .env
 #   docker compose -f docker-compose.prod.yml pull
@@ -33,7 +33,7 @@ services:
   # los microservicios tampoco tienen "ports": desde internet solo se entra por el gateway (8080)
   # asi nadie puede llamar directo a /internal ni saltarse el gateway
   ms-usuarios:
-    image: ${ECR_REGISTRO:?Falta ECR_REGISTRO en el archivo .env}/ferreteria/ms-usuarios:latest
+    image: ${ECR_REGISTRO:?Falta ECR_REGISTRO en el archivo .env}/ferreteria/ms-usuarios:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       <<: *db-comun
@@ -43,7 +43,7 @@ services:
         condition: service_healthy
 
   ms-productos:
-    image: ${ECR_REGISTRO:?Falta ECR_REGISTRO en el archivo .env}/ferreteria/ms-productos:latest
+    image: ${ECR_REGISTRO:?Falta ECR_REGISTRO en el archivo .env}/ferreteria/ms-productos:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       <<: *db-comun
@@ -53,7 +53,7 @@ services:
         condition: service_healthy
 
   ms-pedidos:
-    image: ${ECR_REGISTRO:?Falta ECR_REGISTRO en el archivo .env}/ferreteria/ms-pedidos:latest
+    image: ${ECR_REGISTRO:?Falta ECR_REGISTRO en el archivo .env}/ferreteria/ms-pedidos:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       <<: *db-comun
@@ -66,7 +66,7 @@ services:
         condition: service_healthy
 
   ms-pagos:
-    image: ${ECR_REGISTRO:?Falta ECR_REGISTRO en el archivo .env}/ferreteria/ms-pagos:latest
+    image: ${ECR_REGISTRO:?Falta ECR_REGISTRO en el archivo .env}/ferreteria/ms-pagos:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       <<: *db-comun
@@ -78,7 +78,7 @@ services:
 
   # unico punto de entrada desde internet: http://<ip-del-servidor>:8080
   api-gateway:
-    image: ${ECR_REGISTRO:?Falta ECR_REGISTRO en el archivo .env}/ferreteria/api-gateway:latest
+    image: ${ECR_REGISTRO:?Falta ECR_REGISTRO en el archivo .env}/ferreteria/api-gateway:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       USUARIOS_URL: http://ms-usuarios:8081

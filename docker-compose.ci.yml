@@ -1,0 +1,78 @@
+# Entorno descartable de GitHub Actions. No usa el volumen ni los puertos del entorno habitual.
+x-entorno: &entorno
+  DB_USER: root
+  DB_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD}
+  JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET}
+  INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Falta INTERNAL_API_KEY}
+  JAVA_TOOL_OPTIONS: -Xmx256m
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD}
+    healthcheck:
+      test: [CMD-SHELL, 'mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - datos_ci:/var/lib/mysql
+
+  ms-usuarios:
+    build: ./ms-usuarios
+    environment:
+      <<: *entorno
+      DB_URL: jdbc:mysql://mysql:3306/ferreteria_usuarios?createDatabaseIfNotExist=true&serverTimezone=America/Santiago
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  ms-productos:
+    build: ./ms-productos
+    environment:
+      <<: *entorno
+      DB_URL: jdbc:mysql://mysql:3306/ferreteria_productos?createDatabaseIfNotExist=true&serverTimezone=America/Santiago
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  ms-pedidos:
+    build: ./ms-pedidos
+    environment:
+      <<: *entorno
+      DB_URL: jdbc:mysql://mysql:3306/ferreteria_pedidos?createDatabaseIfNotExist=true&serverTimezone=America/Santiago
+      PRODUCTOS_URL: http://ms-productos:8082
+      USUARIOS_URL: http://ms-usuarios:8081
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  ms-pagos:
+    build: ./ms-pagos
+    environment:
+      <<: *entorno
+      DB_URL: jdbc:mysql://mysql:3306/ferreteria_pagos?createDatabaseIfNotExist=true&serverTimezone=America/Santiago
+      USUARIOS_URL: http://ms-usuarios:8081
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  api-gateway:
+    build: ./api-gateway
+    environment:
+      USUARIOS_URL: http://ms-usuarios:8081
+      PRODUCTOS_URL: http://ms-productos:8082
+      PEDIDOS_URL: http://ms-pedidos:8083
+      PAGOS_URL: http://ms-pagos:8084
+      JAVA_TOOL_OPTIONS: -Xmx256m
+    ports:
+      - '127.0.0.1:18080:8080'
+    depends_on:
+      - ms-usuarios
+      - ms-productos
+      - ms-pedidos
+      - ms-pagos
+
+volumes:
+  datos_ci:
