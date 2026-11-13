@@ -32,6 +32,7 @@ import json
 import time
 from urllib.request import urlopen
 from urllib.error import HTTPError, URLError
+from http.client import HTTPException
 
 for intento in range(60):
     try:
@@ -48,7 +49,7 @@ for intento in range(60):
                     raise ValueError('Servicio no disponible') from None
         print('Deploy verificado: catálogo público y rutas protegidas disponibles.')
         break
-    except (URLError, TimeoutError, ValueError):
+    except (OSError, HTTPException, ValueError):
         if intento == 59:
             raise SystemExit('Falló la comprobación del despliegue. Revisa los contenedores en EC2.')
         time.sleep(3)

@@ -3,7 +3,7 @@ import json
 import os
 import time
 from urllib.request import Request, urlopen
-from urllib.error import HTTPError, URLError
+from http.client import HTTPException
 
 
 def comprobar(base):
@@ -24,7 +24,7 @@ if __name__ == '__main__':
             comprobar(base)
             print('Backend listo: login y consultas de los cuatro microservicios responden correctamente.')
             break
-        except (HTTPError, URLError, TimeoutError, KeyError, ValueError):
+        except (OSError, HTTPException, KeyError, ValueError):
             if intento == 59:
                 raise SystemExit('El backend no quedó disponible. Revisa los logs de los contenedores.')
             time.sleep(3)
