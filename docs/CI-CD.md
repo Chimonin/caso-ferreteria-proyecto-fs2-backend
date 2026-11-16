@@ -55,7 +55,7 @@ El servidor solo expone el gateway en 8080; el acceso público HTTPS debe estar 
 
 ### Acceso de GitHub a AWS
 
-Se usa OIDC, sin claves permanentes de AWS en el repositorio.
+El workflow admite OIDC y credenciales temporales de Learner Lab.
 Crea un proveedor IAM `https://token.actions.githubusercontent.com` con audiencia `sts.amazonaws.com` y un rol asumible por GitHub.
 Limita su confianza al repositorio backend y al environment **production**, usando el `sub` real que emite GitHub.
 El formato puede incluir los IDs inmutables del propietario y repositorio; no copies una política para otra cuenta o un comodín global.
@@ -67,8 +67,12 @@ El rol de GitHub necesita:
 - `ssm:SendCommand` para `AWS-RunShellScript` y la EC2 elegida, y `ssm:GetCommandInvocation` para confirmar el resultado.
 
 No necesita permisos para crear instancias ni bases de datos.
-En AWS Academy puede que no tengas permisos para crear el proveedor OIDC o roles: verifica eso antes de habilitar CD.
-Si el laboratorio lo impide, el CI puede seguir funcionando y el deploy se realiza manualmente hasta disponer de esos permisos.
+Si Learner Lab no permite configurar OIDC, deja vacía la variable `AWS_ROLE_ARN`.
+En el repositorio del backend, guarda `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
+y `AWS_SESSION_TOKEN` como secretos del entorno `production`. Renueva los tres
+cuando caduque la sesión del laboratorio. La sesión debe tener permisos para subir
+imágenes a ECR y ejecutar y consultar el comando SSM. La instancia EC2 sigue
+necesitando sus propios permisos para conectarse a SSM y descargar imágenes de ECR.
 
 Referencias oficiales:
 
@@ -82,7 +86,7 @@ En **Settings → Secrets and variables → Actions → Variables** configura pr
 | Variable | Valor |
 |---|---|
 | `AWS_REGION` | Región donde están ECR y EC2 |
-| `AWS_ROLE_ARN` | ARN del rol OIDC autorizado |
+| `AWS_ROLE_ARN` | ARN del rol OIDC autorizado. Déjala vacía con Learner Lab. |
 | `EC2_INSTANCE_ID` | ID de la instancia administrada por SSM |
 | `AWS_DEPLOY_DIR` | Directorio absoluto con el `.env` del servidor, por ejemplo `/opt/ferreteria` |
 | `AWS_COMPOSE_PROJECT` | Nombre exacto del proyecto Compose existente, para conservar el volumen de MySQL |
