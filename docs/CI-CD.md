@@ -57,7 +57,7 @@ El servidor solo expone el gateway en 8080; el acceso público HTTPS debe estar 
 
 El workflow admite OIDC y credenciales temporales de Learner Lab.
 Crea un proveedor IAM `https://token.actions.githubusercontent.com` con audiencia `sts.amazonaws.com` y un rol asumible por GitHub.
-Limita su confianza al repositorio backend y al environment **production**, usando el `sub` real que emite GitHub.
+Limita su confianza al repositorio backend y al environment **backend-ec2**, usando el `sub` real que emite GitHub.
 El formato puede incluir los IDs inmutables del propietario y repositorio; no copies una política para otra cuenta o un comodín global.
 Configura el environment de GitHub para permitir desplegar únicamente desde `main`.
 
@@ -69,7 +69,7 @@ El rol de GitHub necesita:
 No necesita permisos para crear instancias ni bases de datos.
 Si Learner Lab no permite configurar OIDC, deja vacía la variable `AWS_ROLE_ARN`.
 En el repositorio del backend, guarda `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
-y `AWS_SESSION_TOKEN` como secretos del entorno `production`. Renueva los tres
+y `AWS_SESSION_TOKEN` como secretos del entorno `backend-ec2`. Renueva los tres
 cuando caduque la sesión del laboratorio. La sesión debe tener permisos para subir
 imágenes a ECR y ejecutar y consultar el comando SSM. La instancia EC2 sigue
 necesitando sus propios permisos para conectarse a SSM y descargar imágenes de ECR.
@@ -93,7 +93,7 @@ En **Settings → Secrets and variables → Actions → Variables** configura pr
 | `AWS_DOCKER_PLATFORM` | `linux/amd64` (por defecto) o `linux/arm64` si EC2 usa Graviton |
 | `AWS_DEPLOY_ENABLED` | `true` solo cuando esté todo preparado |
 
-Los primeros datos también pueden configurarse como variables del environment **production**.
+Los primeros datos también pueden configurarse como variables del environment **backend-ec2**.
 `AWS_DEPLOY_ENABLED` debe ser variable del repositorio, porque se evalúa antes de entrar al environment.
 El workflow no usa un archivo PEM ni abre SSH; Systems Manager ejecuta los comandos con el rol de la instancia.
 

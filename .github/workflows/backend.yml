@@ -71,7 +71,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.AWS_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    environment: production
+    environment: backend-ec2
     permissions:
       contents: read
       id-token: write
@@ -106,9 +106,9 @@ jobs:
           LAB_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           LAB_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
         run: |
-          : "${LAB_ACCESS_KEY_ID:?Configura el secreto AWS_ACCESS_KEY_ID en production}"
-          : "${LAB_SECRET_ACCESS_KEY:?Configura el secreto AWS_SECRET_ACCESS_KEY en production}"
-          : "${LAB_SESSION_TOKEN:?Configura el secreto AWS_SESSION_TOKEN en production}"
+          : "${LAB_ACCESS_KEY_ID:?Configura el secreto AWS_ACCESS_KEY_ID en backend-ec2}"
+          : "${LAB_SECRET_ACCESS_KEY:?Configura el secreto AWS_SECRET_ACCESS_KEY en backend-ec2}"
+          : "${LAB_SESSION_TOKEN:?Configura el secreto AWS_SESSION_TOKEN en backend-ec2}"
       - name: Autenticar en AWS con la sesión de Learner Lab
         if: env.AWS_ROLE_ARN == ''
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
